@@ -7,7 +7,7 @@ from pygame.constants import WINDOWCLOSE
 pygame.font.init()
 
 # Reference: https://www.youtube.com/watch?v=Q-__8Xw9KTM
-# Timestamp: 1:04:54
+# Timestamp: 1:23:23
 
 # Pygame Window
 WIDTH, HEIGHT = 800, 600
@@ -37,6 +37,26 @@ YELLOW_LASER = pygame.image.load(
 # Space Background
 SPCBG = pygame.transform.scale(pygame.image.load(
     os.path.join("assets", "background-black.png")), (WIDTH, HEIGHT))
+
+
+class Laser:
+    def __init__(self, x, y, img):
+        self.x = x
+        self.y = y
+        self.img = img
+        self.mask = pygame.mask.from_surface(self.img)
+
+    def draw(self, window):
+        window.blit(self.img, (self.x, self.y))
+
+    def move(self, vel):
+        self.y += vel
+
+    def off_screen(self, height):
+        return self.y < height and self.y >= 0
+
+    def collision(self, obj):
+        return collide(self, obj)
 
 
 class Ship:
@@ -85,6 +105,14 @@ class Enemy(Ship):
     def move(self, vel):
         self.y += vel
 
+# Collide Function
+
+
+def collide(obj1, obj2):
+    # Offset detects if there are pixels overlapping. If there are then it detects it as a collision.
+    offset_x = obj2.x - obj1.x
+    offset_y = obj2.y - obj1.y
+    return obj1.mask.overlap(obj2, (offset_x, offset_y)) != None
 # Main Loop
 
 
@@ -94,6 +122,7 @@ def main():
     level = 0
     lives = 5
     main_font = pygame.font.SysFont("arial_bold", 50)
+    lost_font = pygame.font.SysFont("impact_bold", 60)
 
     enemies = []
     wave_length = 5
@@ -104,6 +133,9 @@ def main():
     player = Player(370, 450)
 
     clock = pygame.time.Clock()
+
+    lost = False
+    lost_count = 0
 
     def redraw_window():
         # "Blit" places the defined "SPCBG" into WIN
@@ -119,11 +151,26 @@ def main():
             enemy.draw(WIN)
 
         player.draw(WIN)
+        # Lost Screen
+        if lost:
+            lost_label = lost_font.render("You Lost, loser!", 1, (255, 0, 0))
+            WIN.blit(lost_label, (WIDTH/2 - lost_label.get_width()/2, 350))
 
         pygame.display.update()
 
     while run:
         clock.tick(FPS)
+        redraw_window()
+
+        if lives <= 0 or player.health <= 0:
+            lost = True
+            lost_count += 1
+
+        if lost:
+            if lost_count > FPS * 3:
+                run = False
+            else:
+                continue
 
         if len(enemies) == 0:
             level += 1
@@ -149,10 +196,11 @@ def main():
         if keys[pygame.K_q]:  # Quits Game
             run = False
 
-        for enemy in enemies:
+        for enemy in enemies[:]:
             enemy.move(enemy_vel)
-
-        redraw_window()
+            if enemy.y + enemy.get_height() > HEIGHT:
+                lives -= 1
+                enemies: remove(enemy)
 
 
 main()
