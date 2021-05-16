@@ -3,11 +3,13 @@ import os
 import time
 import random
 from pygame.constants import WINDOWCLOSE
+from pygame import mixer
 # Initializes Font
 pygame.font.init()
+# Initializes mixer (music)
+pygame.mixer.init()
 
-# Reference: https://www.youtube.com/watch?v=Q-__8Xw9KTM
-# Timestamp: 1:23:23
+# Made by: Joshua Lagat
 
 # Pygame Window
 WIDTH, HEIGHT = 1280, 720
@@ -17,6 +19,18 @@ pygame.display.set_caption("Space Colonizers")
 
 # Main Menu Font
 main_font = pygame.font.Font("joystix monospace.ttf", 25)
+
+# Sounds
+laser_sound = mixer.Sound("laser.wav")
+explosion_sound = mixer.Sound("explosion.wav")
+pop_sound = mixer.Sound("pop.wav")
+gameover_sound = mixer.Sound("gameover.wav")
+bruh_sound = mixer.Sound("bruh.wav")
+
+# Game Icon
+GAME_ICON = pygame.image.load(
+    os.path.join("assets", "icon.png"))
+pygame.display.set_icon(GAME_ICON)
 
 # Load image assets
 RED_SPACE_SHIP = pygame.image.load(
@@ -41,6 +55,12 @@ YELLOW_LASER = pygame.image.load(
 SPCBG = pygame.transform.scale(pygame.image.load(
     os.path.join("assets", "background-black.png")), (WIDTH, HEIGHT))
 
+# Background Music
+mixer.music.load("background-music.wav")
+mixer.music.play(-1)
+
+# Laser
+
 
 class Laser:
     def __init__(self, x, y, img):
@@ -60,6 +80,8 @@ class Laser:
 
     def collision(self, obj):
         return collide(self, obj)
+
+# Ship
 
 
 class Ship:
@@ -88,6 +110,7 @@ class Ship:
             elif laser.collision(obj):
                 obj.health -= 10
                 self.lasers.remove(laser)
+                explosion_sound.play()
 
     def cooldown(self):
         if self.cool_down_counter >= self.COOLDOWN:
@@ -100,12 +123,15 @@ class Ship:
             laser = Laser(self.x, self.y, self.laser_img)
             self.lasers.append(laser)
             self.cool_down_counter = 1
+            laser_sound.play()
 
     def get_width(self):
         return self.ship_img.get_width()
 
     def get_height(self):
         return self.ship_img.get_width()
+
+# Player
 
 
 class Player(Ship):
@@ -125,6 +151,7 @@ class Player(Ship):
             else:
                 for obj in objs:
                     if laser.collision(obj):
+                        explosion_sound.play()
                         objs.remove(obj)
                         if laser in self.lasers:
                             self.lasers.remove(laser)
@@ -139,6 +166,8 @@ class Player(Ship):
         super().draw(window)
         self.health_bar(window)
 
+# Enemy
+
 
 class Enemy(Ship):
     # COLOR_MAP is a dictionary where it defines which spaceships and lasers go where using strings.
@@ -150,6 +179,7 @@ class Enemy(Ship):
 
     def __init__(self, x, y, color, health=100):
         super().__init__(x, y, health)
+        pop_sound.play()
         # This calls on color_map to define the ships using strings that are in a dictionary.
         self.ship_img, self.laser_img = self.COLOR_MAP[color]
         self.mask = pygame.mask.from_surface(self.ship_img)
@@ -158,10 +188,13 @@ class Enemy(Ship):
         self.y += vel
 
     def shoot(self):
+        laser_sound.play()
         if self.cool_down_counter == 0:
             laser = Laser(self.x-24, self.y, self.laser_img)
             self.lasers.append(laser)
             self.cool_down_counter = 1
+
+# Collision Loop
 
 
 def collide(obj1, obj2):
@@ -170,10 +203,12 @@ def collide(obj1, obj2):
     # Uses map.overlap to identify if there are overlapping pixels.
     return obj1.mask.overlap(obj2.mask, (offset_x, offset_y)) != None
 
+# Main Loop
+
 
 def main():
     run = True
-    FPS = 60
+    FPS = 360
     level = 0
     lives = 5
     main_font = pygame.font.Font("joystix monospace.ttf", 40)
@@ -183,7 +218,7 @@ def main():
     wave_length = 2
     enemy_vel = 2
 
-    player_vel = 15
+    player_vel = 14
     laser_vel = 12
 
     player = Player(350, 400)
@@ -209,6 +244,7 @@ def main():
         player.draw(WIN)
         # Lost Screen
         if lost:
+            gameover_sound.play()
             lost_label = lost_font.render("You Lost, loser!", 1, (255, 0, 0))
             WIN.blit(lost_label, (WIDTH/2 - lost_label.get_width()/2, 350))
 
@@ -223,14 +259,15 @@ def main():
             lost_count += 1
 
         if lost:
-            if lost_count > FPS * 3:
+            if lost_count > FPS * 0.25:
+                pop_sound.play()
                 run = False
             else:
                 continue
 
         if len(enemies) == 0:
             level += 1
-            wave_length += 5
+            wave_length += 3
             for i in range(wave_length):
                 enemy = Enemy(random.randrange(50, WIDTH-100),
                               random.randrange(-1500*level/5, -100), random.choice(["red", "blue", "green"]))
@@ -264,6 +301,8 @@ def main():
             if collide(enemy, player):
                 player.health -= 10
                 enemies.remove(enemy)
+                explosion_sound.play()
+                bruh_sound.play()
             elif enemy.y + enemy.get_height() > HEIGHT:
                 lives -= 1
                 enemies.remove(enemy)
